@@ -4,7 +4,7 @@ const uuidV4 = require('uuid').v4;
 const jwt = require('jsonwebtoken');
 const validateUserRequirements = require('../validators/authValidator');
 const users = require('../models/User');
-let refreshTokenData = require('../models/RefreshToken');
+const refreshTokenData = require('../models/RefreshToken');
 
 const signupHandler = async (req, res) => {
     try {
@@ -84,7 +84,47 @@ const loginHandler = async (req, res) => {
     }
 }
 
+const refreshHandler = (req, res) => {
+    if(!req.cookies.jwt) return res.sendStatus(401);
+
+    try {
+        var decoded = jwt.verify(req.cookies.jwt, process.env.REFRESH_TOKEN_SECRET);
+        if(!decoded.userid) throw new Error('decoded userid not found');
+
+        const userIndex = refreshTokenData.findIndex(u => u.userid === decoded.userid && u.refreshToken === req.cookies.jwt);
+        if(userIndex === -1) throw new Error('user already logout');
+
+    } catch (error) {
+        res.clearCookie('jwt');
+        console.error(error.message);
+        return res.sendStatus(403);
+    }
+
+    const newAccessToken = jwt.sign(
+        { "userid": decoded.userid },
+        process.env.ACCESS_TOKEN_SECRET,
+        { expiresIn: '15m'}
+    );
+    res.json({ newAccessToken })
+}
+
+const logoutHandler = (req, res) => {
+    if(!req.cookies.jwt) return res.sendStatus(401);
+
+    const userIndex = refreshTokenData.findIndex(u => u.refreshToken === req.cookies.jwt);
+    if(userIndex === -1) {
+        res.clearCookie('jwt');
+        return res.sendStatus(200);
+    }
+
+    refreshTokenData.splice(userIndex, 1);
+    res.clearCookie('jwt');
+    res.sendStatus(200);
+}
+
 module.exports = { 
     signupHandler,
-    loginHandler
+    loginHandler,
+    refreshHandler,
+    logoutHandler
 }
