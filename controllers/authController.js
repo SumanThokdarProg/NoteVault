@@ -1,10 +1,9 @@
 // NoteVault\controllers\authController.js
 const argon2 = require('argon2');
-const uuidV4 = require('uuid').v4;
 const jwt = require('jsonwebtoken');
 const validateUserRequirements = require('../validators/authValidator');
-const users = require('../models/User');
-const refreshTokenData = require('../models/RefreshToken');
+const User = require('../models/User');
+const RefreshToken = require('../models/RefreshToken');
 
 const signupHandler = async (req, res) => {
     try {
@@ -13,24 +12,20 @@ const signupHandler = async (req, res) => {
             return res.status(400).send(error.details[0].message);        // requirements dose not match
         }
 
-        const userIndex = users.findIndex(u => u.email === value.email);
-        if(userIndex !== -1) {
+        const userExists = await User.findOne({ email: value.email }).exec();
+        if(userExists) {
             return res.sendStatus(409);    // email already exists
         }
 
         const hashPassword = await argon2.hash(value.password);
-        const userId = uuidV4();
-        const newUser = {
-            userid: userId,
+        const result = await User.create({
             email: value.email,
             password: hashPassword,
-            datetime: new Date()
-        }
-        users.push(newUser);
+        });
 
         res.status(201).json({
-            "userId": newUser.userid,
-            "email": newUser.email
+            "userId": result._id,
+            "email": result.email
         });
     } catch(error) {
         console.error(error);
@@ -43,40 +38,49 @@ const loginHandler = async (req, res) => {
         const { error, value } = validateUserRequirements(req.body);
         if(error) return res.status(400).send(error.details[0].message);
 
-        const validUser = users.find(u => u.email === value.email);
+        const validUser = await User.findOne({ email: value.email }).exec();
         if(!validUser) return res.sendStatus(404);
 
         const checkPassword = await argon2.verify(validUser.password, value.password);
         if(!checkPassword) return res.sendStatus(401);
         
-        const accessToken = jwt.sign(
-            { "userid": validUser.userid },
+        const newAccessToken = jwt.sign(
+            { 
+                "userid": validUser._id,
+                "role": validUser.role
+            },
             process.env.ACCESS_TOKEN_SECRET,
             { expiresIn: '15m'}
         );
-        const refreshToken = jwt.sign(
-            { "userid": validUser.userid },
+        const newRefreshToken = jwt.sign(
+            { 
+                "userid": validUser._id,
+                "role": validUser.role
+            },
             process.env.REFRESH_TOKEN_SECRET,
             { expiresIn: '7d'}
         );
 
-        const userIndex = refreshTokenData.findIndex(rtd => rtd.userid === validUser.userid);
-        const newToken = {
-            "userid": validUser.userid,
-            refreshToken
-        }
-        if(userIndex !== -1) refreshTokenData.splice(userIndex, 1);
-            
-        refreshTokenData.push(newToken);
+        const result = await RefreshToken.findOneAndUpdate(
+            { user: validUser._id },        // how to find the document 
+            {
+                $set: { refreshToken: newRefreshToken }       // what data to update or insert
+            },
+            {
+                upsert: true,                   // create document if it dose'n exists
+                returnDocument: 'after',        // return the update/inserted document instead of the old one 
+                runValidators: true             // enforce schema validation on update 
+            }
+        );
+        // console.log(result);
 
-
-        res.cookie('jwt', refreshToken, { 
+        res.cookie('jwt', newRefreshToken, { 
             httpOnly: true, 
             sameSite: 'None', 
             secure: process.env.NODE_ENV === 'production', 
             maxAge: 7 * 24 * 60 * 60 * 1000 
         });
-        res.json({ accessToken });
+        res.json({ newAccessToken });
 
     } catch(error) {
         console.error(error.message);
@@ -84,15 +88,15 @@ const loginHandler = async (req, res) => {
     }
 }
 
-const refreshHandler = (req, res) => {
+const refreshHandler = async (req, res) => {
     if(!req.cookies.jwt) return res.sendStatus(401);
 
     try {
         var decoded = jwt.verify(req.cookies.jwt, process.env.REFRESH_TOKEN_SECRET);
-        if(!decoded.userid) throw new Error('decoded userid not found');
+        if(!decoded.userid || !decoded.role) throw new Error('decoded userid or role not found');
 
-        const userIndex = refreshTokenData.findIndex(u => u.userid === decoded.userid && u.refreshToken === req.cookies.jwt);
-        if(userIndex === -1) throw new Error('user already logout');
+        const findRefreshToken = await RefreshToken.findOne({ user: decoded.userid, refreshToken: req.cookies.jwt })
+        if(!findRefreshToken) throw new Error('user already logout');
 
     } catch (error) {
         res.clearCookie('jwt');
@@ -101,25 +105,26 @@ const refreshHandler = (req, res) => {
     }
 
     const newAccessToken = jwt.sign(
-        { "userid": decoded.userid },
+        { "userid": decoded.userid, "role": decoded.role },
         process.env.ACCESS_TOKEN_SECRET,
         { expiresIn: '15m'}
     );
     res.json({ newAccessToken })
 }
 
-const logoutHandler = (req, res) => {
+const logoutHandler = async (req, res) => {
     if(!req.cookies.jwt) return res.sendStatus(401);
-
-    const userIndex = refreshTokenData.findIndex(u => u.refreshToken === req.cookies.jwt);
-    if(userIndex === -1) {
+    try {
+        const deleteToken = await RefreshToken.findOneAndDelete({ refreshToken: req.cookies.jwt });
+        // console.log(deleteToken);
+        
         res.clearCookie('jwt');
-        return res.sendStatus(200);
+        res.sendStatus(200);
+    } catch (error) {
+        res.clearCookie('jwt');
+        console.error(error.message);
+        return res.sendStatus(500);
     }
-
-    refreshTokenData.splice(userIndex, 1);
-    res.clearCookie('jwt');
-    res.sendStatus(200);
 }
 
 module.exports = { 
