@@ -33,6 +33,7 @@ app.get('/', (req, res) => {
 // routers
 app.use('/auth', require('./routes/authRoutes'));
 app.use('/notes', require('./routes/notesRoutes'));
+app.use('/users', require('./routes/userRoutes'));
 
 mongoose.connection.once('open', () => {
     console.log('Connected to MongoDB');
