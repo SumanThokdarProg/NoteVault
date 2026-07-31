@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const validateUserRequirements = require('../validators/authValidator');
 const User = require('../models/User');
 const RefreshToken = require('../models/RefreshToken');
+const { default: mongoose } = require('mongoose');
+const Note = require('../models/Note');
 
 const signupHandler = async (req, res) => {
     try {
@@ -127,9 +129,29 @@ const logoutHandler = async (req, res) => {
     }
 }
 
+const deleteAccount = async (req, res) => {
+    try {
+        const currentUser = await User.findOne({ _id: req.user.userid });
+        if(!currentUser) return res.sendStatus(404);
+
+        const verify = await argon2.verify(currentUser.password, req.body.password);
+        if(!verify) return res.sendStatus(401);
+
+        await Note.deleteMany({ owner: currentUser._id });
+        await RefreshToken.deleteMany({ user: currentUser._id });
+        await User.deleteOne({ _id: currentUser._id });
+
+        res.clearCookie('jwt');
+        res.sendStatus(200);
+    } catch(err) {
+        res.status(500).json({ "message": err.message });
+    }
+}
+
 module.exports = { 
     signupHandler,
     loginHandler,
     refreshHandler,
-    logoutHandler
+    logoutHandler,
+    deleteAccount
 }
