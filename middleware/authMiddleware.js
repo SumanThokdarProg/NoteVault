@@ -9,9 +9,9 @@ const authMiddleware = (req, res, next) => {
     const token = authHeader.split(' ')[1];
     try {
         const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-        if(!decoded.userid) throw new Error('userid not found');
+        if(!decoded.userid || !decoded.role) throw new Error('userid or role not found');
 
-        req.user = { userid: decoded.userid }
+        req.user = { userid: decoded.userid, role: decoded.role }
         next();
     } catch(error) {
         console.log(error.message);

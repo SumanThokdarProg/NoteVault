@@ -21,6 +21,11 @@ connectDB();
 app.use(express.json());
 app.use(cookieParser());
 
+app.use((req, res, next) => {
+    if(!req.body) req.body = {};
+    next();
+})
+
 app.get('/', (req, res) => {
     res.send('Hello from NoteVault!');
 });
