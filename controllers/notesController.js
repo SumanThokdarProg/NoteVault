@@ -1,6 +1,7 @@
 // notesController.js 
 const mongoose = require('mongoose');
 const Note = require('../models/Note');
+const User = require('../models/User');
 const validateNote = require('../validators/noteValidator');
 
 const getAllNotes = async (req, res) => {
@@ -79,10 +80,27 @@ const createNote = async (req, res) => {
     }
 }
 
+const getUserNotesAdmin = async (req, res) => {
+    try {
+        if(!mongoose.isValidObjectId(req.params.userid)) return res.sendStatus(400);
+
+        const validUser = await User.findOne({ _id: req.params.userid }).exec();
+        if(!validUser) return res.sendStatus(404);
+
+        const result = await Note.find({ owner: validUser._id });
+        res.json(result);
+
+    } catch(err) {
+        console.log(err.message);
+        res.sendStatus(500);
+    }
+}
+
 module.exports = {
     getAllNotes,
     getSingleNote,
     updateNote,
     deleteNote,
-    createNote
+    createNote,
+    getUserNotesAdmin
 }

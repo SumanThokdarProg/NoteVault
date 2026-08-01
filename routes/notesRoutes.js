@@ -1,7 +1,7 @@
 // noteRoutes.js 
 const express = require('express');
 const { authMiddleware } = require('../middleware/authMiddleware');
-const { getAllNotes, getSingleNote, updateNote, deleteNote, createNote } = require('../controllers/notesController');
+const { getAllNotes, getSingleNote, updateNote, deleteNote, createNote, getUserNotesAdmin } = require('../controllers/notesController');
 const requireRole = require('../middleware/requireRole');
 
 const router = express.Router();
@@ -15,7 +15,9 @@ router.route('/:id')
     .put(authMiddleware, updateNote)
     .delete(authMiddleware, deleteNote);
     
-router.delete('/admin-test', authMiddleware, requireRole(['admin']),(req, res) => {
+router.get('/user/:userid', authMiddleware, requireRole(['admin']), getUserNotesAdmin);
+
+router.delete('/admin-test', authMiddleware, requireRole(['admin']), (req, res) => {
     res.json({
         "message": "You are an admin",
         "userid": req.user.userid,

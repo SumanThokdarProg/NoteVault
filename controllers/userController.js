@@ -26,22 +26,6 @@ const getAllUsers = async (req, res) => {
     }
 }
 
-const getUserNotesAdmin = async (req, res) => {
-    try {
-        if(!mongoose.isValidObjectId(req.params.userid)) return res.sendStatus(400);
-
-        const validUser = await User.findOne({ _id: req.params.userid }).exec();
-        if(!validUser) return res.sendStatus(404);
-
-        const result = await Note.find({ owner: validUser._id });
-        res.json(result);
-
-    } catch(err) {
-        res.sendStatus(500);
-    }
-}
-
 module.exports = { 
-    getAllUsers,
-    getUserNotesAdmin
+    getAllUsers
 };
