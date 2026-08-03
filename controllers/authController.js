@@ -9,7 +9,8 @@ const Note = require('../models/Note');
 
 const signupHandler = async (req, res) => {
     try {
-        const { error, value } = validateUserRequirements(req.body);
+        const payload = req.body || {};
+        const { error, value } = validateUserRequirements(payload);
         if(error) {
             return res.status(400).send(error.details[0].message);        // requirements dose not match
         }
@@ -37,7 +38,8 @@ const signupHandler = async (req, res) => {
 
 const loginHandler = async (req, res) => {
     try {
-        const { error, value } = validateUserRequirements(req.body);
+        const payload = req.body || {};
+        const { error, value } = validateUserRequirements(payload);
         if(error) return res.status(400).send(error.details[0].message);
 
         const validUser = await User.findOne({ email: value.email }).exec();

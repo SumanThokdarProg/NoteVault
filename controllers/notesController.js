@@ -1,4 +1,4 @@
-// notesController.js 
+// /controller/notesController.js 
 const mongoose = require('mongoose');
 const Note = require('../models/Note');
 const User = require('../models/User');
@@ -43,8 +43,13 @@ const updateNote = async (req, res) => {
                 runValidators: true
             }
         );
+        if(!result) {
+            return res.status(404).json({
+                "message": "note not found"
+            });
+        }
+
         res.json(result);
-        
     } catch(err) {
         res.status(500).json({ "message": err.message });
     }
