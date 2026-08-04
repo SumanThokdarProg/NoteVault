@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const app = express();
+const path = require('node:path');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -13,8 +14,8 @@ app.use((req, res, next) => {
     next();
 });
 
-app.get('/', (req, res) => {
-    res.send('Hello from NoteVault!');
+app.get(/^\/($|index(\.html)?)$/, (req, res) => {
+    res.status(200).sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // routers

@@ -2,6 +2,9 @@
 
 A secure, role-based Notes API built with Node.js, Express, and MongoDB. NoteVault implements a complete JWT-based authentication system with access/refresh token rotation, role-based authorization, and fully ownership-scoped CRUD operations for notes.
 
+**Live API:** [https://notevault-fec8.onrender.com](https://notevault-fec8.onrender.com)
+> Hosted on Render's free tier — the first request after a period of inactivity may take 30–60 seconds while the service spins back up.
+
 This project was built as a hands-on learning exercise to understand authentication, middleware, and REST API design from first principles — every route, validation rule, and security check was designed and implemented manually rather than copied from a boilerplate.
 
 ## Features
@@ -48,6 +51,8 @@ This project was built as a hands-on learning exercise to understand authenticat
 | Validation | `joi` |
 | Cookies | `cookie-parser` |
 | Environment config | `dotenv` |
+| Testing | Jest, Supertest, mongodb-memory-server |
+| Hosting | Render (API), MongoDB Atlas (database) |
 
 ## Project Structure
 
@@ -73,10 +78,19 @@ NoteVault/
 ├── validators/
 │   ├── authValidator.js
 │   └── noteValidator.js
-├── .env                     # environment variables (not committed)
-├── index.js                 # app entry point
+├── tests/
+│   ├── setup/
+│   │   ├── dbHandler.js     # connect/clear/close an in-memory test database
+│   │   └── testHelpers.js   # shared test helpers (e.g. signup + login a test user)
+│   ├── auth.test.js
+│   └── notes.test.js
+├── app.js                   # builds the Express app (middleware + routes)
+├── index.js                 # entry point — loads env, connects DB, starts the server
+├── .env.example              # template for required environment variables
 └── package.json
 ```
+
+> `app.js` and `index.js` are deliberately separate: `app.js` only builds the Express app and is what test files import, while `index.js` handles environment setup, the database connection, and starting the actual server. This keeps tests from needing a live database connection or an open port.
 
 ## Getting Started
 
@@ -94,25 +108,38 @@ npm install
 
 ### Environment Variables
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` and fill in your own values:
+
+```bash
+cp .env.example .env
+```
 
 ```env
 PORT=3000
+NODE_ENV=development
 DATABASE_URI=your_mongodb_connection_string
 ACCESS_TOKEN_SECRET=your_access_token_secret
 REFRESH_TOKEN_SECRET=your_refresh_token_secret
-NODE_ENV=development
 ```
 
-> **Note:** `ACCESS_TOKEN_SECRET` and `REFRESH_TOKEN_SECRET` should be long, random strings, and must be different from each other.
+> `ACCESS_TOKEN_SECRET` and `REFRESH_TOKEN_SECRET` should be long, random strings, and must be different from each other.
 
 ### Run the server
 
 ```bash
-npm run dev
+npm start       # production
+npm run dev     # development, with nodemon
 ```
 
 The API will be available at `http://localhost:3000`.
+
+### Run the tests
+
+```bash
+npm test
+```
+
+Tests run against a temporary, in-memory MongoDB instance (via `mongodb-memory-server`) — no connection to your real Atlas cluster is made, and no real data is touched.
 
 ## API Reference
 
@@ -151,8 +178,15 @@ The API will be available at `http://localhost:3000`.
 4. **Refreshing** — when the access token expires, the client calls `/auth/refresh`. The server verifies the refresh token cookie against the record stored in the database and issues a new access token.
 5. **Logout** — the refresh token is deleted from the database and its cookie is cleared, immediately invalidating that session.
 
-## Roadmap
+## Deployment
 
+The API is deployed on [Render](https://render.com), connected directly to this GitHub repository. Render auto-deploys on every push to `master` — no manual redeploy step is needed. The database is hosted on MongoDB Atlas, with network access opened to allow connections from Render's servers (which don't have a fixed IP).
+
+Environment variables are configured directly in Render's dashboard rather than committed to the repo.
+
+## Known Limitations / Roadmap
+
+- **No CORS configuration yet.** The API currently has no `cors` middleware, so browser-based frontends on a different origin cannot call it directly (tools like Postman/Thunder Client aren't affected, since CORS is enforced by browsers). This will be added once the frontend is connected.
 - [ ] Pagination on `/notes` and `/users`
 - [ ] Rate limiting on login to mitigate brute-force attempts
 - [ ] React frontend to consume this API
