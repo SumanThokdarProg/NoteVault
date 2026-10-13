@@ -4,7 +4,6 @@ const jwt = require('jsonwebtoken');
 const validateUserRequirements = require('../validators/authValidator');
 const User = require('../models/User');
 const RefreshToken = require('../models/RefreshToken');
-const { default: mongoose } = require('mongoose');
 const Note = require('../models/Note');
 
 const signupHandler = async (req, res) => {
@@ -77,11 +76,11 @@ const loginHandler = async (req, res) => {
             }
         );
         // console.log(result);
-
+        const isProd = process.env.NODE_ENV === 'production';
         res.cookie('jwt', newRefreshToken, { 
             httpOnly: true, 
             sameSite: 'None', 
-            secure: process.env.NODE_ENV === 'production', 
+            secure: isProd ? 'None' : 'Lax', 
             maxAge: 7 * 24 * 60 * 60 * 1000 
         });
         res.json({ newAccessToken });
